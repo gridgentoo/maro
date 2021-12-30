@@ -14,24 +14,6 @@ from maro.utils import clone
 
 
 class DiscreteMADDPGTrainOps(AbsTrainOps):
-    """The discrete variant of MADDPG algorithm.
-    Args:
-        name (str): Name of the worker.
-        device (torch.device): Which device to use.
-        reward_discount (float): The discount factor of feature reward.
-        get_q_critic_net_func (Callable[[], MultiQNet): Function to get Q critic net.
-        critic_loss_coef (float): Coefficient for critic loss in total loss. Defaults to 1.0.
-        soft_update_coef (float): Soft update coefficient, e.g., target_model = (soft_update_coef) * eval_model +
-            (1-soft_update_coef) * target_model. Defaults to 1.0.
-        update_target_every (int): Number of training rounds between policy target model updates. Defaults to 5.
-        q_value_loss_func (Callable): The loss function provided by torch.nn or a custom loss class for the
-            Q-value loss. Defaults to None.
-        enable_data_parallelism (bool): Whether to enable data parallelism in this trainer. Defaults to False.
-
-    Reference:
-        Paper: http://papers.nips.cc/paper/by-source-2017-3193
-        Code: https://github.com/openai/maddpg
-    """
     def __init__(
         self,
         name: str,
@@ -260,7 +242,7 @@ class DistributedDiscreteMADDPG(MultiTrainer):
         shared_critic: bool = False,
     ) -> None:
         super(DistributedDiscreteMADDPG, self).__init__(
-            name, get_policy_func_dict, device, enable_data_parallelism, dispatcher_address, train_batch_size
+            name, get_policy_func_dict, dispatcher_address, train_batch_size
         )
 
         self._critic_ops: Union[DiscreteMADDPGTrainOps, RemoteOps, None] = None

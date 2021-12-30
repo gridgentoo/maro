@@ -10,36 +10,32 @@ from maro.rl_v3.utils import AbsTransitionBatch, MultiTransitionBatch, Transitio
 
 
 class AbsTrainer(object, metaclass=ABCMeta):
-    """Policy trainer used to train policies. Trainer maintains several train workers and
-    controls training logics of them, while train workers take charge of specific policy updating.
+    """Policy trainer used to train policies. Trainer maintains several train ops and
+    controls training logics of them, while train ops take charge of specific policy updating.
     """
     def __init__(
         self,
         name: str,
         get_policy_func_dict: Dict[str, Callable[[str], RLPolicy]],
-        device: str = None,
-        enable_data_parallelism: bool = False,
         dispatcher_address: Tuple[str, int] = None,
         train_batch_size: int = 128
     ) -> None:
         """
         Args:
-            name (str): Name of the trainer
-            device (str): Device to store this trainer. If it is None, the device will be set to "cpu" if cuda is
-                unavailable and "cuda" otherwise. Defaults to None.
-            enable_data_parallelism (bool): Whether to enable data parallelism in this trainer.
-            train_batch_size (int): train batch size.
+            name (str): Name of the trainer.
+            get_policy_func_dict (Dict[str, Callable[[str], RLPolicy]]): Dict of functions that used to create policies.
+            dispatcher_address (Tuple[str, int]): The address of the dispatcher. This is used under only distributed
+                model. Defaults to None.
+            train_batch_size (int): Train batch size. Defaults to 128.
         """
         self._name = name
         self._get_policy_func_dict = get_policy_func_dict
-        self._device = device
-        self._enable_data_parallelism = enable_data_parallelism
         self._dispatcher_address = dispatcher_address
         self._train_batch_size = train_batch_size
 
         self._ops_creator: Optional[Dict[str, Callable[[str], AbsTrainOps]]] = None
 
-        print(f"Creating trainer {self.__class__.__name__} {name} on device {self._device}")
+        print(f"Creating trainer {self.__class__.__name__} {name}.")
 
     @property
     def name(self) -> str:
@@ -96,8 +92,6 @@ class SingleTrainer(AbsTrainer, metaclass=ABCMeta):
         self,
         name: str,
         get_policy_func_dict: Dict[str, Callable[[str], RLPolicy]],
-        device: str = None,
-        enable_data_parallelism: bool = False,
         dispatcher_address: Tuple[str, int] = None,
         train_batch_size: int = 128
     ) -> None:
@@ -105,8 +99,7 @@ class SingleTrainer(AbsTrainer, metaclass=ABCMeta):
             raise ValueError(f"trainer {self._name} cannot have more than one policy assigned to it")
 
         super(SingleTrainer, self).__init__(
-            name, get_policy_func_dict, device,
-            enable_data_parallelism, dispatcher_address, train_batch_size
+            name, get_policy_func_dict, dispatcher_address, train_batch_size
         )
 
         self._replay_memory: Optional[ReplayMemory] = None
@@ -116,8 +109,7 @@ class SingleTrainer(AbsTrainer, metaclass=ABCMeta):
         self._get_policy_func = lambda: get_policy_func_dict[self._policy_name](self._policy_name)
 
     def record(self, transition_batch: TransitionBatch) -> None:
-        """
-        Record the experiences collected by external modules.
+        """Record the experiences collected by external modules.
 
         Args:
             transition_batch (TransitionBatch): A TransitionBatch item that contains a batch of experiences.
@@ -147,14 +139,11 @@ class MultiTrainer(AbsTrainer, metaclass=ABCMeta):
         self,
         name: str,
         get_policy_func_dict: Dict[str, Callable[[str], RLPolicy]],
-        device: str = None,
-        enable_data_parallelism: bool = False,
         dispatcher_address: Tuple[str, int] = None,
         train_batch_size: int = 128
     ) -> None:
         super(MultiTrainer, self).__init__(
-            name, get_policy_func_dict, device,
-            enable_data_parallelism, dispatcher_address, train_batch_size
+            name, get_policy_func_dict, dispatcher_address, train_batch_size
         )
 
         self._replay_memory: Optional[MultiReplayMemory] = None
@@ -166,8 +155,7 @@ class MultiTrainer(AbsTrainer, metaclass=ABCMeta):
         return len(self._ops_list)
 
     def record(self, transition_batch: MultiTransitionBatch) -> None:
-        """
-        Record the experiences collected by external modules.
+        """Record the experiences collected by external modules.
 
         Args:
             transition_batch (MultiTransitionBatch): A TransitionBatch item that contains a batch of experiences.

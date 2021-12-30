@@ -9,9 +9,8 @@ from maro.rl_v3.utils import AbsTransitionBatch, MultiTransitionBatch, Transitio
 
 
 class AbsTrainOps(object, metaclass=ABCMeta):
-    """The basic component for training a policy, which mainly takes charge of gradient computation and policy update.
-    In trainer, train worker hosts a policy, and trainer hosts several train workers. In gradient workers,
-    the train worker is an atomic representation of a policy, to perform parallel gradient computing.
+    """The basic component for training a policy, which takes charge of gradient computation and policy update.
+    Each ops is used for training a single policy. An ops is an atomic unit in the distributed mode.
     """
     def __init__(
         self,
@@ -21,6 +20,15 @@ class AbsTrainOps(object, metaclass=ABCMeta):
         get_policy_func: Callable[[], RLPolicy],
         enable_data_parallelism: bool = False,
     ) -> None:
+        """
+        Args:
+            name (str): Name of the ops.
+            device (str): Identifier for the torch device. The policy will be moved to the specified device. If it is
+                None, the device will be set to "cpu" if cuda is unavailable and "cuda" otherwise. Defaults to None.
+            is_single_scenario (bool): Identifier of whether this ops is used under a single trainer or a multi trainer.
+            get_policy_func (Callable[[], RLPolicy]): Function used to create the policy of this ops.
+            enable_data_parallelism (bool): Whether to enable data parallelism in this trainer. Defaults to False.
+        """
         super(AbsTrainOps, self).__init__()
         self._name = name
         self._device = torch.device(device) if device is not None \
@@ -28,6 +36,7 @@ class AbsTrainOps(object, metaclass=ABCMeta):
         self._is_single_scenario = is_single_scenario
         self._enable_data_parallelism = enable_data_parallelism
 
+        # Create the policy and put it on the right device.
         self._policy = get_policy_func()
         self._policy.to_device(self._device)
 
@@ -48,6 +57,9 @@ class AbsTrainOps(object, metaclass=ABCMeta):
         return self._policy.action_dim
 
     def _is_valid_transition_batch(self, batch: AbsTransitionBatch) -> bool:
+        """Used to check the transition batch's type. If this ops is used under a single trainer, the batch should be
+        a `TransitionBatch`. Otherwise, it should be a `MultiTransitionBatch`.
+        """
         return isinstance(batch, TransitionBatch) if self._is_single_scenario \
             else isinstance(batch, MultiTransitionBatch)
 
@@ -57,6 +69,16 @@ class AbsTrainOps(object, metaclass=ABCMeta):
         tensor_dict: Dict[str, object] = None,
         scope: str = "all"
     ) -> Dict[str, Dict[str, torch.Tensor]]:
+        """Calculate the gradients of the given batch, with the auxiliary tensors.
+
+        Args:
+            batch (AbsTransitionBatch): The training batch.
+            tensor_dict (Dict[str, object]): Auxiliary tensors used in the calculation. Defaults to None.
+            scope (str): The scope of the parts that should be calculated. Defaults to 'all'.
+
+        Returns:
+            A dict with format: {part identifier: {param name: gradient}}
+        """
         if self._enable_data_parallelism:
             gradients = self._remote_learn(batch, tensor_dict, scope)
             return average_grads(gradients)
@@ -83,6 +105,16 @@ class AbsTrainOps(object, metaclass=ABCMeta):
         tensor_dict: Dict[str, object] = None,
         scope: str = "all"
     ) -> Dict[str, Dict[str, torch.Tensor]]:
+        """The actual logic of gradients calculation.
+
+        Args:
+            batch (AbsTransitionBatch): The training batch.
+            tensor_dict (Dict[str, object]): Auxiliary tensors used in the calculation. Defaults to None.
+            scope (str): The scope of the parts that should be calculated. Defaults to 'all'.
+
+        Returns:
+            A dict with format: {part identifier: {param name: gradient}}
+        """
         raise NotImplementedError
 
     @abstractmethod

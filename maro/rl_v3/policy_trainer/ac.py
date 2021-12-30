@@ -1,4 +1,3 @@
-import asyncio
 from typing import Callable, Dict, List, Tuple
 
 import numpy as np
@@ -51,8 +50,7 @@ class DiscreteActorCriticOps(AbsTrainOps):
         tensor_dict: Dict[str, object] = None,
         scope: str = "all"
     ) -> Dict[str, Dict[str, torch.Tensor]]:
-        """
-        Reference: https://tinyurl.com/2ezte4cr
+        """Reference: https://tinyurl.com/2ezte4cr
         """
         assert scope in ("all", "actor", "critic"), \
             f"Unrecognized scope {scope}. Excepting 'all', 'actor', or 'critic'."
@@ -120,15 +118,15 @@ class DiscreteActorCriticOps(AbsTrainOps):
 
         return self._policy.get_gradients(actor_loss)
 
-    def update(self) -> None:
+    def update(self, grad_iters: int) -> None:
+        """Reference: https://tinyurl.com/2ezte4cr
         """
-        Reference: https://tinyurl.com/2ezte4cr
-        """
-        grad_dict = self._get_batch_grad(self._batch, scope="all")
-        self._policy.train()
-        self._policy.apply_gradients(grad_dict["actor_grad"])
-        self._v_critic_net.train()
-        self._v_critic_net.apply_gradients(grad_dict["critic_grad"])
+        for _ in range(grad_iters):
+            grad_dict = self._get_batch_grad(self._batch, scope="all")
+            self._policy.train()
+            self._policy.apply_gradients(grad_dict["actor_grad"])
+            self._v_critic_net.train()
+            self._v_critic_net.apply_gradients(grad_dict["critic_grad"])
 
     def get_ops_state_dict(self, scope: str = "all") -> dict:
         ret_dict = {}
@@ -154,23 +152,28 @@ class DiscreteActorCritic(SingleTrainer):
 
     Args:
         name (str): Unique identifier for the policy.
+        get_policy_func_dict (Dict[str, Callable[[str], DiscretePolicyGradient]]): Dict of functions that used to
+            create policies.
         get_v_critic_net_func (Callable[[], VNet]): Function to get V critic net.
-        policy (DiscretePolicyGradient): The policy to be trained.
-        replay_memory_capacity (int): Capacity of the replay memory. Defaults to 10000.
-        train_batch_size (int): Batch size for training the Q-net. Defaults to 128.
-        grad_iters (int): Number of iterations to calculate gradients. Defaults to 1.
-        reward_discount (float): Reward decay as defined in standard RL terminology. Defaults to 0.9.
-        lam (float): Lambda value for generalized advantage estimation (TD-Lambda). Defaults to 0.9.
-        clip_ratio (float): Clip ratio in the PPO algorithm (https://arxiv.org/pdf/1707.06347.pdf). Defaults to None,
-            in which case the actor loss is calculated using the usual policy gradient theorem.
-        critic_loss_cls: A string indicating a loss class provided by torch.nn or a custom loss class for computing
-            the critic loss. If it is a string, it must be a key in ``TORCH_LOSS``. Defaults to "mse".
-        min_logp (float): Lower bound for clamping logP values during learning. This is to prevent logP from becoming
-            very large in magnitude and causing stability issues. Defaults to None, which means no lower bound.
-        critic_loss_coef (float): Coefficient for critic loss in total loss. Defaults to 1.0.
         device (str): Identifier for the torch device. The policy will be moved to the specified device. If it is
             None, the device will be set to "cpu" if cuda is unavailable and "cuda" otherwise. Defaults to None.
         enable_data_parallelism (bool): Whether to enable data parallelism in this trainer. Defaults to False.
+        dispatcher_address (Tuple[str, int]): The address of the dispatcher. This is used under only distributed
+            model. Defaults to None.
+        train_batch_size (int): Train batch size. Defaults to 128.
+
+        replay_memory_capacity (int): Capacity of the replay memory. Defaults to 10000.
+        grad_iters (int): Number of iterations to calculate gradients. Defaults to 1.
+
+        reward_discount (float): Reward decay as defined in standard RL terminology. Defaults to 0.9.
+        critic_loss_coef (float): Coefficient for critic loss in total loss. Defaults to 0.1.
+        critic_loss_cls: A string indicating a loss class provided by torch.nn or a custom loss class for computing
+            the critic loss. If it is a string, it must be a key in ``TORCH_LOSS``. Defaults to "mse".
+        clip_ratio (float): Clip ratio in the PPO algorithm (https://arxiv.org/pdf/1707.06347.pdf). Defaults to None,
+            in which case the actor loss is calculated using the usual policy gradient theorem.
+        lam (float): Lambda value for generalized advantage estimation (TD-Lambda). Defaults to 0.9.
+        min_logp (float): Lower bound for clamping logP values during learning. This is to prevent logP from becoming
+            very large in magnitude and causing stability issues. Defaults to None, which means no lower bound.
     """
     def __init__(
         self,
@@ -183,7 +186,7 @@ class DiscreteActorCritic(SingleTrainer):
         train_batch_size: int = 128,
         *,
         # Training params
-        replay_memory_size: int = 10000,
+        replay_memory_capacity: int = 10000,
         grad_iters: int = 1,
         # Ops params
         reward_discount: float = 0.9,
@@ -194,14 +197,14 @@ class DiscreteActorCritic(SingleTrainer):
         min_logp: float = None,
     ) -> None:
         super(DiscreteActorCritic, self).__init__(
-            name, get_policy_func_dict, device, enable_data_parallelism, dispatcher_address, train_batch_size
+            name, get_policy_func_dict, dispatcher_address, train_batch_size
         )
 
         self._grad_iters = grad_iters
-        self._replay_memory_size = replay_memory_size
+        self._replay_memory_size = replay_memory_capacity
 
         self._ops_params = {
-            "device": self._device,
+            "device": device,
             "get_policy_func": self._get_policy_func,
             "get_v_critic_net_func": get_v_critic_net_func,
             "enable_data_parallelism": enable_data_parallelism,
@@ -215,9 +218,7 @@ class DiscreteActorCritic(SingleTrainer):
 
     def train_step(self):
         self._ops.set_batch(self._get_batch())
-        for _ in range(self._grad_iters):
-            self._ops.update()
-            # await asyncio.gather(self._ops.update())  # TODO: move grad iters inside
+        self._ops.update(self._grad_iters)
 
     def _get_ops_creator_impl(self) -> Dict[str, Callable[[str], AbsTrainOps]]:
         ops_creator: Dict[str, Callable[[str], AbsTrainOps]] = {

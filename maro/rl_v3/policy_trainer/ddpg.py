@@ -57,8 +57,7 @@ class DDPGTrainOps(AbsTrainOps):
         tensor_dict: Dict[str, object] = None,
         scope: str = "all"
     ) -> Dict[str, Dict[str, torch.Tensor]]:
-        """
-        Reference: https://spinningup.openai.com/en/latest/algorithms/ddpg.html
+        """Reference: https://spinningup.openai.com/en/latest/algorithms/ddpg.html
         """
 
         assert scope in ("all", "actor", "critic"), \
@@ -158,24 +157,28 @@ class DDPG(SingleTrainer):
 
     Args:
         name (str): Unique identifier for the policy.
-        get_q_critic_net_func (Callable[[], QNet]): Function to get Q critic net.
-        reward_discount (float): Reward decay as defined in standard RL terminology.
-        q_value_loss_cls: A string indicating a loss class provided by torch.nn or a custom loss class for
-            the Q-value loss. If it is a string, it must be a key in ``TORCH_LOSS``. Defaults to "mse".
-        policy (DiscretePolicyGradient): The policy to be trained.
-        random_overwrite (bool): This specifies overwrite behavior when the replay memory capacity is reached. If True,
-            overwrite positions will be selected randomly. Otherwise, overwrites will occur sequentially with
-            wrap-around. Defaults to False.
-        replay_memory_capacity (int): Capacity of the replay memory. Defaults to 10000.
-        num_epochs (int): Number of training epochs per call to ``learn``. Defaults to 1.
-        update_target_every (int): Number of training rounds between policy target model updates.
-        soft_update_coef (float): Soft update coefficient, e.g., target_model = (soft_update_coef) * eval_model +
-            (1-soft_update_coef) * target_model. Defaults to 1.0.
-        train_batch_size (int): Batch size for training the Q-net. Defaults to 32.
-        critic_loss_coef (float): Coefficient for critic loss in total loss. Defaults to 1.0.
+        get_policy_func_dict (Dict[str, Callable[[str], DiscretePolicyGradient]]): Dict of functions that used to
+            create policies.
         device (str): Identifier for the torch device. The policy will be moved to the specified device. If it is
             None, the device will be set to "cpu" if cuda is unavailable and "cuda" otherwise. Defaults to None.
         enable_data_parallelism (bool): Whether to enable data parallelism in this trainer. Defaults to False.
+        dispatcher_address (Tuple[str, int]): The address of the dispatcher. This is used under only distributed
+            model. Defaults to None.
+        train_batch_size (int): Train batch size. Defaults to 128.
+
+        replay_memory_capacity (int): Capacity of the replay memory. Defaults to 10000.
+        random_overwrite (bool): This specifies overwrite behavior when the replay memory capacity is reached. If True,
+            overwrite positions will be selected randomly. Otherwise, overwrites will occur sequentially with
+            wrap-around. Defaults to False.
+        num_epochs (int): Number of training epochs per call to ``learn``. Defaults to 1.
+        update_target_every (int): Number of training rounds between policy target model updates.
+
+        reward_discount (float): Reward decay as defined in standard RL terminology.
+        q_value_loss_cls: A string indicating a loss class provided by torch.nn or a custom loss class for
+            the Q-value loss. If it is a string, it must be a key in ``TORCH_LOSS``. Defaults to "mse".
+        soft_update_coef (float): Soft update coefficient, e.g., target_model = (soft_update_coef) * eval_model +
+            (1-soft_update_coef) * target_model. Defaults to 1.0.
+        critic_loss_coef (float): Coefficient for critic loss in total loss. Defaults to 0.1.
     """
 
     def __init__(
@@ -188,21 +191,19 @@ class DDPG(SingleTrainer):
         dispatcher_address: Tuple[str, int] = None,
         train_batch_size: int = 128,
         *,
-        #
-        state_dim: int,
-        action_dim: int,
+        # Training params
         replay_memory_capacity: int = 10000,
         random_overwrite: bool = False,
         num_epochs: int = 1,
         update_target_every: int = 5,
-        #
+        # Ops params
         reward_discount: float,
         q_value_loss_cls: Callable = None,
         soft_update_coef: float = 1.0,
         critic_loss_coef: float = 0.1
     ) -> None:
         super(DDPG, self).__init__(
-            name, get_policy_func_dict, device, enable_data_parallelism, dispatcher_address, train_batch_size
+            name, get_policy_func_dict, dispatcher_address, train_batch_size
         )
 
         self._num_epochs = num_epochs
@@ -213,7 +214,7 @@ class DDPG(SingleTrainer):
         self._random_overwrite = random_overwrite
 
         self._ops_params = {
-            "device": self._device,
+            "device": device,
             "get_policy_func": self._get_policy_func,
             "get_q_critic_net_func": get_q_critic_net_func,
             "enable_data_parallelism": enable_data_parallelism,

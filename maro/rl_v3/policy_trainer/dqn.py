@@ -102,25 +102,30 @@ class DQN(SingleTrainer):
     See https://web.stanford.edu/class/psych209/Readings/MnihEtAlHassibis15NatureControlDeepRL.pdf for details.
 
     Args:
-        name (str): Unique identifier for the trainer.
-        q_net (ValueBasedPolicy): Q-function.
-        replay_memory_capacity (int): Capacity of the replay memory. Defaults to 100000.
-        train_batch_size (int): Batch size for training the Q-net. Defaults to 128.
+        name (str): Unique identifier for the policy.
+        get_policy_func_dict (Dict[str, Callable[[str], DiscretePolicyGradient]]): Dict of functions that used to
+            create policies.
+        device (str): Identifier for the torch device. The policy will be moved to the specified device. If it is
+            None, the device will be set to "cpu" if cuda is unavailable and "cuda" otherwise. Defaults to None.
+        enable_data_parallelism (bool): Whether to enable data parallelism in this trainer. Defaults to False.
+        dispatcher_address (Tuple[str, int]): The address of the dispatcher. This is used under only distributed
+            model. Defaults to None.
+        train_batch_size (int): Train batch size. Defaults to 128.
+
         num_epochs (int): Number of training epochs per call to ``learn``. Defaults to 1.
-        reward_discount (float): Reward decay as defined in standard RL terminology. Defaults to 0.9.
         update_target_every (int): Number of gradient steps between target model updates. Defaults to 5.
+        replay_memory_capacity (int): Capacity of the replay memory. Defaults to 10000.
+        random_overwrite (bool): This specifies overwrite behavior when the replay memory capacity is reached. If True,
+            overwrite positions will be selected randomly. Otherwise, overwrites will occur sequentially with
+            wrap-around. Defaults to False.
+
+        reward_discount (float): Reward decay as defined in standard RL terminology. Defaults to 0.9.
         soft_update_coef (float): Soft update coefficient, e.g.,
             target_model = (soft_update_coef) * eval_model + (1-soft_update_coef) * target_model.
             Defaults to 0.1.
         double (bool): If True, the next Q values will be computed according to the double DQN algorithm,
             i.e., q_next = Q_target(s, argmax(Q_eval(s, a))). Otherwise, q_next = max(Q_target(s, a)).
             See https://arxiv.org/pdf/1509.06461.pdf for details. Defaults to False.
-        random_overwrite (bool): This specifies overwrite behavior when the replay memory capacity is reached. If True,
-            overwrite positions will be selected randomly. Otherwise, overwrites will occur sequentially with
-            wrap-around. Defaults to False.
-        device (str): Identifier for the torch device. The policy will be moved to the specified device. If it is
-            None, the device will be set to "cpu" if cuda is unavailable and "cuda" otherwise. Defaults to None.
-        enable_data_parallelism (bool): Whether to enable data parallelism in this trainer. Defaults to False.
     """
     def __init__(
         self,
@@ -142,7 +147,7 @@ class DQN(SingleTrainer):
         double: bool = False,
     ) -> None:
         super(DQN, self).__init__(
-            name, get_policy_func_dict, device, enable_data_parallelism, dispatcher_address, train_batch_size
+            name, get_policy_func_dict, dispatcher_address, train_batch_size
         )
 
         self._num_epochs = num_epochs
@@ -154,7 +159,7 @@ class DQN(SingleTrainer):
         self._q_net_version = self._target_q_net_version = 0
 
         self._ops_params = {
-            "device": self._device,
+            "device": device,
             "get_policy_func": self._get_policy_func,
             "enable_data_parallelism": enable_data_parallelism,
             "reward_discount": reward_discount,
