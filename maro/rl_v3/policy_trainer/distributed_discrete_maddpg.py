@@ -6,11 +6,12 @@ import torch
 from maro.rl_v3.distributed.remote import RemoteOps
 from maro.rl_v3.model import MultiQNet
 from maro.rl_v3.policy import DiscretePolicyGradient
-from maro.rl_v3.policy_trainer import MultiTrainer
-from maro.rl_v3.policy_trainer.abs_train_ops import AbsTrainOps
 from maro.rl_v3.replay_memory import RandomMultiReplayMemory
 from maro.rl_v3.utils import MultiTransitionBatch, ndarray_to_tensor
 from maro.utils import clone
+
+from .abs_train_ops import AbsTrainOps
+from .abs_trainer import MultiTrainer
 
 
 class DiscreteMADDPGTrainOps(AbsTrainOps):

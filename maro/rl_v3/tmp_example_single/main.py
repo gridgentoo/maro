@@ -1,5 +1,6 @@
 from maro.rl_v3 import run_workflow_centralized_mode
-from maro.rl_v3.learning import SimpleAgentWrapper, SimpleTrainerManager
+from maro.rl_v3.learning import SimpleAgentWrapper
+from maro.rl_v3.policy_trainer import SimpleTrainerManager
 from maro.simulator import Env
 
 from .callbacks import cim_post_collect, cim_post_evaluate

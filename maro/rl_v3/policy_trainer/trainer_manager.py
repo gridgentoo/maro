@@ -4,13 +4,14 @@ from typing import Callable, Dict, List, Type
 
 import numpy as np
 
+from maro.rl_v3.learning import ExpElement
 from maro.rl_v3.policy import RLPolicy
-from maro.rl_v3.policy_trainer import AbsTrainer, DiscreteActorCritic, DistributedDiscreteMADDPG, DQN, MultiTrainer, \
-    SingleTrainer
+from maro.rl_v3.policy_trainer import (
+    AbsTrainer, DiscreteActorCritic, DistributedDiscreteMADDPG, DQN, MultiTrainer, SingleTrainer
+)
 from maro.rl_v3.utils import MultiTransitionBatch, TransitionBatch
 
-from .env_sampler import ExpElement
-from ..policy_trainer.utils import extract_trainer_name
+from .utils import extract_trainer_name
 
 
 class AbsTrainerManager(object, metaclass=ABCMeta):

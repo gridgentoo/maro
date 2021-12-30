@@ -6,9 +6,6 @@ from zmq.asyncio import Context
 from .utils import bytes_to_pyobj, pyobj_to_bytes, string_to_bytes
 
 
-# TODO: Add allowed function set
-
-
 def remote_method(ops_name: str, func_name: str, dispatcher_address: str) -> Callable:
     async def remote_call(*args, **kwargs):
         req = {"func": func_name, "args": args, "kwargs": kwargs}

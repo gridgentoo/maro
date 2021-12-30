@@ -12,7 +12,6 @@ from typing import Callable, Dict, List, Optional, Tuple
 from maro.communication import Proxy, SessionType
 from maro.rl.utils import MsgKey, MsgTag
 from maro.utils import DummyLogger, Logger, set_seeds
-
 from .env_sampler import AbsEnvSampler, ExpElement
 
 

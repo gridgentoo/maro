@@ -1,8 +1,9 @@
 import time
 from typing import Callable, Dict, List
 
-from maro.rl_v3.learning import AbsEnvSampler, AbsTrainerManager, ExpElement
+from maro.rl_v3.learning import AbsEnvSampler, ExpElement
 from maro.rl_v3.policy import RLPolicy
+from maro.rl_v3.policy_trainer import AbsTrainerManager
 
 
 def preprocess_get_policy_func_dict(

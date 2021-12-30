@@ -8,6 +8,7 @@ from maro.rl_v3.model import VNet
 from maro.rl_v3.policy import DiscretePolicyGradient
 from maro.rl_v3.replay_memory import FIFOReplayMemory
 from maro.rl_v3.utils import AbsTransitionBatch, ndarray_to_tensor, TransitionBatch
+
 from .abs_train_ops import AbsTrainOps
 from .abs_trainer import SingleTrainer
 

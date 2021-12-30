@@ -2,11 +2,12 @@ import asyncio
 from abc import ABCMeta, abstractmethod
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
-from maro.rl_v3.distributed.remote import RemoteOps
+from maro.rl_v3.distributed import RemoteOps
 from maro.rl_v3.policy import RLPolicy
-from maro.rl_v3.policy_trainer.abs_train_ops import AbsTrainOps
 from maro.rl_v3.replay_memory import MultiReplayMemory, ReplayMemory
 from maro.rl_v3.utils import AbsTransitionBatch, MultiTransitionBatch, TransitionBatch
+
+from .abs_train_ops import AbsTrainOps
 
 
 class AbsTrainer(object, metaclass=ABCMeta):
