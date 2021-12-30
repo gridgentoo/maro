@@ -6,6 +6,9 @@ from zmq.asyncio import Context
 from .utils import bytes_to_pyobj, pyobj_to_bytes, string_to_bytes
 
 
+# TODO: Add allowed function set
+
+
 def remote_method(ops_name: str, func_name: str, dispatcher_address: str) -> Callable:
     async def remote_call(*args, **kwargs):
         req = {"func": func_name, "args": args, "kwargs": kwargs}
@@ -26,9 +29,6 @@ def remote_method(ops_name: str, func_name: str, dispatcher_address: str) -> Cal
 class RemoteOps(object):
     def __init__(self, ops_name, dispatcher_address: Tuple[str, int]):
         self._ops_name = ops_name
-        # self._functions = {
-        #   name for name, _ in inspect.getmembers(train_op_cls, lambda attr: inspect.isfunction(attr))
-        # }
         host, port = dispatcher_address
         self._dispatcher_address = f"tcp://{host}:{port}"
 

@@ -1,14 +1,16 @@
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Type
 
 import numpy as np
 
 from maro.rl_v3.policy import RLPolicy
-from maro.rl_v3.policy_trainer import AbsTrainer, MultiTrainer, SingleTrainer
+from maro.rl_v3.policy_trainer import AbsTrainer, DiscreteActorCritic, DistributedDiscreteMADDPG, DQN, MultiTrainer, \
+    SingleTrainer
 from maro.rl_v3.utils import MultiTransitionBatch, TransitionBatch
 
 from .env_sampler import ExpElement
+from ..policy_trainer.utils import extract_trainer_name
 
 
 class AbsTrainerManager(object, metaclass=ABCMeta):
@@ -55,13 +57,30 @@ class AbsTrainerManager(object, metaclass=ABCMeta):
         raise NotImplementedError
 
 
+TRAINER_TYPE_MAP: Dict[str, Type[AbsTrainer]] = {
+    "ac": DiscreteActorCritic,
+    "dqn": DQN,
+    "discretemaddpg": DistributedDiscreteMADDPG,
+}
+
+
+def create_trainer(
+    trainer_name: str, trainer_param: dict, get_policy_func_dict: Dict[str, Callable[[str], RLPolicy]]
+) -> AbsTrainer:
+    trainer_type = trainer_name.split("_")[0]
+    if trainer_type not in TRAINER_TYPE_MAP:
+        raise ValueError(f"Unrecognized trainer type {trainer_type}.")
+
+    trainer_cls = TRAINER_TYPE_MAP[trainer_type]
+    return trainer_cls(name=trainer_name, get_policy_func_dict=get_policy_func_dict, **trainer_param)
+
+
 class SimpleTrainerManager(AbsTrainerManager):
     def __init__(
         self,
-        get_trainer_func_dict: Dict[str, Callable[[str], AbsTrainer]],
         get_policy_func_dict: Dict[str, Callable[[str], RLPolicy]],
         agent2policy: Dict[str, str],  # {agent_name: policy_name}
-        policy2trainer: Dict[str, str],  # {policy_name: trainer_name}
+        trainer_param_dict: Dict[str, dict],
     ) -> None:
         """
         Simple trainer manager. Use this in centralized model.
@@ -72,31 +91,22 @@ class SimpleTrainerManager(AbsTrainerManager):
             agent2policy (Dict[str, str]): Agent name to policy name mapping.
             policy2trainer (Dict[str, str]): Policy name to trainer name mapping.
         """
-
         super(SimpleTrainerManager, self).__init__()
 
-        self._trainer_dict: Dict[str, AbsTrainer] = {name: func(name) for name, func in get_trainer_func_dict.items()}
-        self._trainers: List[AbsTrainer] = list(self._trainer_dict.values())
+        self._trainer_dict: Dict[str, AbsTrainer] = {}
+        self._trainers: List[AbsTrainer] = []
+        for trainer_name, trainer_param in trainer_param_dict.items():
+            cur_get_policy_func_dict = {
+                policy_name: func for policy_name, func in get_policy_func_dict.items()
+                if extract_trainer_name(policy_name) == trainer_name
+            }
+            trainer = create_trainer(trainer_name, trainer_param, cur_get_policy_func_dict)
+            trainer.build()
+            self._trainer_dict[trainer_name] = trainer
+            self._trainers.append(trainer)
 
         self._policy_dict: Dict[str, RLPolicy] = {name: func(name) for name, func in get_policy_func_dict.items()}
-
         self._agent2policy = agent2policy
-        self._policy2trainer = policy2trainer
-
-        # register policies
-        trainer_policies = defaultdict(list)
-        for policy_name, trainer_name in self._policy2trainer.items():
-            policy = self._policy_dict[policy_name]
-            trainer_policies[trainer_name].append(policy)
-        for trainer_name, trainer in self._trainer_dict.items():
-            policies = trainer_policies[trainer_name]
-            if isinstance(trainer, SingleTrainer):
-                assert len(policies) == 1
-                trainer.register_policy(policies[0])
-            elif isinstance(trainer, MultiTrainer):
-                trainer.register_policies(policies)
-            else:
-                raise ValueError
 
     def _train_impl(self) -> None:
         for trainer in self._trainers:
@@ -129,7 +139,7 @@ class SimpleTrainerManager(AbsTrainerManager):
         trainer_buffer = defaultdict(list)
         for agent_name, agent_state in agent_state_dict.items():
             policy_name = self._agent2policy[agent_name]
-            trainer_name = self._policy2trainer[policy_name]
+            trainer_name = extract_trainer_name(policy_name)
 
             action = action_dict[agent_name]
             reward = reward_dict[agent_name]

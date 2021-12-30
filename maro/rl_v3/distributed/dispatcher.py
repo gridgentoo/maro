@@ -37,7 +37,7 @@ class Dispatcher(object):
         # bookkeeping
         self._num_workers = num_workers
         self._hash_fn = hash_fn
-        self._ops2node: Dict[str, int] = {}
+        self._ops2node: Dict[str, int] = {}  # {ops name: worker id}
 
     def _route_request_to_compute_node(self, msg: list) -> None:
         ops_name, _, req = msg
